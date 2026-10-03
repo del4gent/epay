@@ -230,7 +230,7 @@ export const useGameStore = create<GameState>((set) => ({
       const response = await llmService.generateResponse(messages, []);
       let content = response.content || "";
 
-      const missionMatch = content.match(/\[ACTION:START_MISSION:(\d+)\]/);
+      const missionMatch = content.match(/\\[ACTION:START_MISSION:(\d+)\\]/);
       if (missionMatch) {
         const duration = parseInt(missionMatch[1], 10) || 10000;
         if (bot.status === 'idle') {
@@ -241,7 +241,7 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
 
-      const sellMatch = content.match(/\[ACTION:SELL_ITEM:([^:]+):(\d+)\]/);
+      const sellMatch = content.match(/\\[ACTION:SELL_ITEM:([^:]+):(\d+)\\]/);
       if (sellMatch) {
         const itemName = sellMatch[1].trim();
         const price = parseInt(sellMatch[2], 10);
@@ -254,7 +254,7 @@ export const useGameStore = create<GameState>((set) => ({
         }
       }
 
-      const searchMatch = content.match(/\[ACTION:SEARCH_MARKET:([^:]+):(\d+)\]/);
+      const searchMatch = content.match(/\\[ACTION:SEARCH_MARKET:([^:]+):(\d+)\\]/);
       if (searchMatch) {
         const query = searchMatch[1].trim();
         const budget = parseInt(searchMatch[2], 10) || 100;

@@ -13,6 +13,7 @@ export class LLMService {
       this.engine = await CreateMLCEngine(this.selectedModel, { initProgressCallback: progressCallback });
     } catch (e) {
       console.error("Failed to init LLM engine", e);
+      throw e;
     } finally {
       this.isInitializing = false;
     }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Clock, Send, User, MessageSquare, LineChart } from 'lucide-react';
+import { Package, Clock, Send, User, MessageSquare, LineChart, ShoppingCart, Search, Zap, Info, Users } from 'lucide-react';
 import { useGameStore } from './store/gameStore';
 import type { Item } from './types';
 import { t } from './i18n';
@@ -18,6 +18,7 @@ function App() {
   const { 
     money, moneyHistory, inventory, bots, missions, completeMission, 
     chatHistory, addChatMessage,
+    marketItems, buyMarketItem, agentSearchMarket,
     llmReady, llmLoadingText, initLLM, sendMessageToBotWithLLM
   } = useGameStore();
   const [tick, setTick] = useState(0);
@@ -26,7 +27,45 @@ function App() {
   const [typingBots, setTypingBots] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'cargo' | 'account'>('dashboard');
+  type TabType = 'dashboard' | 'chat' | 'cargo' | 'shop' | 'community' | 'account';
+
+  const getInitialTab = (): TabType => {
+    const hash = window.location.hash.replace('#', '');
+    const validTabs: TabType[] = ['dashboard', 'chat', 'cargo', 'shop', 'community', 'account'];
+    return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
+  };
+
+  const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
+
+  useEffect(() => {
+    window.location.hash = activeTab;
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      const validTabs: TabType[] = ['dashboard', 'chat', 'cargo', 'shop', 'community', 'account'];
+      if (validTabs.includes(hash as TabType)) {
+        setActiveTab(hash as TabType);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const mockedUsers = [
+    { id: '1', name: 'veri', level: 42, isOnline: true, color: 'bg-purple-500' },
+    { id: '2', name: 'sommerbist', level: 38, isOnline: true, color: 'bg-yellow-500' },
+    { id: '3', name: 'tracemaker', level: 55, isOnline: false, color: 'bg-green-500' },
+    { id: '4', name: 'neo', level: 12, isOnline: true, color: 'bg-blue-500' },
+    { id: '5', name: 'trinity', level: 27, isOnline: false, color: 'bg-red-500' }
+  ];
+
+  // Auto-initialize LLM on startup
+  useEffect(() => {
+    // Only call it once on mount
+    initLLM();
+  }, []);
 
   // Global Game Tick
   useEffect(() => {
@@ -182,6 +221,37 @@ function App() {
                 <PortfolioChart data={moneyHistory} />
               </div>
 
+              <div className="space-y-3 pt-2">
+                <h3 className="text-[13px] font-medium text-gray-400 uppercase tracking-wider">{t('recommendedActions')}</h3>
+                <div className="grid grid-cols-1 gap-3">
+                  <button 
+                    onClick={() => setActiveTab('chat')} 
+                    className="flex flex-col text-left bg-white border border-gray-100 hover:border-gray-300 p-4 rounded-2xl transition-all shadow-sm hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                        <Zap className="w-4 h-4" />
+                      </div>
+                      <span className="text-[14px] font-medium text-gray-900">{t('actionOrchestrate')}</span>
+                    </div>
+                    <p className="text-[12px] text-gray-500">{t('actionOrchestrateDesc')}</p>
+                  </button>
+                  
+                  <button 
+                    onClick={() => setActiveTab('cargo')}
+                    className="flex flex-col text-left bg-white border border-gray-100 hover:border-gray-300 p-4 rounded-2xl transition-all shadow-sm hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
+                        <Info className="w-4 h-4" />
+                      </div>
+                      <span className="text-[14px] font-medium text-gray-900">{t('actionNewInfo')}</span>
+                    </div>
+                    <p className="text-[12px] text-gray-500">{t('actionNewInfoDesc')}</p>
+                  </button>
+                </div>
+              </div>
+
               <div className="space-y-4 pt-4">
                 <h3 className="text-[13px] font-medium text-gray-400 uppercase tracking-wider">{t('statistics')}</h3>
                 <div className="flex flex-col gap-4">
@@ -238,8 +308,15 @@ function App() {
                       <p className="text-[13px] text-gray-500 mt-1 max-w-[200px] mx-auto">Initialize the local LLM for smart chat.</p>
                     </div>
                     {llmLoadingText ? (
-                      <div className="text-[11px] font-mono text-gray-500 bg-gray-100 px-3 py-2 rounded-lg max-w-full break-all">
-                        {llmLoadingText}
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className={`text-[11px] font-mono ${llmLoadingText.startsWith('Init Error') ? 'text-red-500 bg-red-50' : 'text-gray-500 bg-gray-100'} px-3 py-2 rounded-lg max-w-full break-all`}>
+                          {llmLoadingText}
+                        </div>
+                        {llmLoadingText.startsWith('Init Error') && (
+                          <button onClick={initLLM} className="bg-black hover:bg-gray-800 text-white text-[11px] font-medium px-4 py-1.5 rounded-full transition-colors mt-2">
+                            Retry Initialization
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <button onClick={initLLM} className="bg-black hover:bg-gray-800 text-white text-[13px] font-medium px-5 py-2.5 rounded-full transition-colors mt-2">
@@ -355,6 +432,110 @@ function App() {
             </div>
           )}
 
+          {/* --- SHOP TAB --- */}
+          {activeTab === 'shop' && (
+            <div className="flex flex-col h-full bg-white overflow-y-auto px-6 py-4 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-medium text-black">{t('shop')}</h2>
+                <span className="text-sm font-medium text-gray-900">${money.toLocaleString('de-DE')}</span>
+              </div>
+
+              {/* Agent Search Mock UI */}
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-black">
+                  <Search className="w-4 h-4" /> {t('agentSearch')}
+                </div>
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    const query = formData.get('query') as string;
+                    const budgetStr = formData.get('budget') as string;
+                    agentSearchMarket(bots[0].id, budgetStr ? parseInt(budgetStr) : undefined, query);
+                    e.currentTarget.reset();
+                  }}
+                  className="flex flex-col gap-2"
+                >
+                  <input name="query" type="text" placeholder={t('searchPlaceholder')} className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black" />
+                  <div className="flex gap-2">
+                    <input name="budget" type="number" placeholder={t('budget')} className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-black" />
+                    <button type="submit" className="bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">{t('search')}</button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="space-y-4 pt-2">
+                <h3 className="text-[13px] font-medium text-gray-400 uppercase tracking-wider">{t('market')}</h3>
+                
+                {marketItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-gray-400 space-y-4">
+                    <ShoppingCart className="w-8 h-8 stroke-1" />
+                    <p className="text-[14px]">{t('noMarketItems')}</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {marketItems.map(mkt => (
+                      <div key={mkt.id} className={`flex flex-col bg-white border ${mkt.isAgentFound ? 'border-blue-200 bg-blue-50/30' : 'border-gray-100'} p-4 rounded-2xl transition-colors`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${mkt.item.rarity === 'rare' || mkt.item.rarity === 'illegal' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}>
+                              <Package className="w-4 h-4 stroke-1" />
+                            </div>
+                            <div>
+                              <h3 className="text-[14px] font-medium text-black">{mkt.item.name}</h3>
+                              <p className="text-[11px] text-gray-500 capitalize">{mkt.item.rarity} • {t('seller')}: {mkt.sellerName}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[15px] font-medium text-black">
+                              ${mkt.price.toLocaleString('de-DE')}
+                            </div>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => buyMarketItem(mkt.id)}
+                          disabled={money < mkt.price}
+                          className="w-full mt-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:hover:bg-gray-100 text-black font-medium py-2 rounded-xl text-[13px] transition-colors"
+                        >
+                          {t('buy')}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* --- COMMUNITY TAB --- */}
+          {activeTab === 'community' && (
+            <div className="flex flex-col h-full bg-white overflow-y-auto px-6 py-4 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-medium text-black">{t('community')}</h2>
+                <span className="text-sm text-gray-500">{mockedUsers.length} {t('realUsers')}</span>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-3">
+                {mockedUsers.map(user => (
+                  <div key={user.id} className="flex items-center justify-between bg-white border border-gray-100 p-4 rounded-2xl hover:border-gray-200 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${user.color}`}>
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-[15px] font-medium text-black">{user.name}</h3>
+                          <div className={`w-2 h-2 rounded-full ${user.isOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
+                        </div>
+                        <p className="text-xs text-gray-500">{t('level')} {user.level}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* --- ACCOUNT / STATS TAB --- */}
           {activeTab === 'account' && (
             <div className="flex flex-col h-full bg-white overflow-y-auto px-6 py-4 space-y-8">
@@ -433,6 +614,22 @@ function App() {
             <span className="text-[11px] font-medium">{t('cargo')}</span>
           </button>
           
+          <button 
+            onClick={() => setActiveTab('shop')}
+            className={`flex flex-col items-center justify-center w-full h-full space-y-1.5 transition-colors ${activeTab === 'shop' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            <ShoppingCart className="w-6 h-6 stroke-1" />
+            <span className="text-[11px] font-medium">{t('shop')}</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('community')}
+            className={`flex flex-col items-center justify-center w-full h-full space-y-1.5 transition-colors ${activeTab === 'community' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            <Users className="w-6 h-6 stroke-1" />
+            <span className="text-[11px] font-medium">{t('community')}</span>
+          </button>
+
           <button 
             onClick={() => setActiveTab('account')}
             className={`flex flex-col items-center justify-center w-full h-full space-y-1.5 transition-colors ${activeTab === 'account' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}

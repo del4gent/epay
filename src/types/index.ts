@@ -12,6 +12,14 @@ export type Listing = {
   timeListed: number;
 };
 
+export type MarketItem = {
+  id: string;
+  item: Item;
+  price: number;
+  sellerName: string;
+  isAgentFound?: boolean;
+};
+
 export type Bot = {
   id: string;
   name: string;
