@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type { Item, Listing, Bot, Mission, ChatMessage } from '../types';
+import sparkyAvatar from '../assets/sparky.jpg';
+import novaAvatar from '../assets/nova.jpg';
 
 interface GameState {
   money: number;
@@ -19,8 +21,8 @@ interface GameState {
 }
 
 const INITIAL_BOTS: Bot[] = [
-  { id: 'bot-1', name: 'Sparky (Engineer)', avatar: '/sparky.jpg', level: 1, status: 'idle' },
-  { id: 'bot-2', name: 'Nova (Navigator)', avatar: '/nova.jpg', level: 1, status: 'idle' }
+  { id: 'bot-1', name: 'Sparky (Engineer)', avatar: sparkyAvatar, level: 1, status: 'idle' },
+  { id: 'bot-2', name: 'Nova (Navigator)', avatar: novaAvatar, level: 1, status: 'idle' }
 ];
 
 const INITIAL_CHAT: ChatMessage[] = [

@@ -1,6 +1,14 @@
-# ePay
+# Project Agent-Crew
 
-Ein modernes Web-Projekt, basierend auf React, TypeScript und Vite.
+Ein Management- und Orchestrierungs-Spiel, bei dem du als "Orchestrator" ein Team aus intelligenten KI-Agenten leitest (basierend auf React, TypeScript und Vite).
+
+## 🎮 Spielprinzip
+
+1. **Deine Rolle als Orchestrator:** Du bist der "Orchestrator". Zu Beginn des Spiels packst du vielleicht noch selbst mit an, aber im späteren Verlauf geht es primär darum, Aufgaben an deine Agenten (deine Kollegen / Crew) zu delegieren und diese intelligent zu koordinieren.
+2. **Kommando-Zentrale (Chat-Interface):** Die Interaktion mit deinem Team findet über ein Terminal im Chat-Format statt. Du wählst ein Crew-Mitglied aus und schreibst ihm direkte Anweisungen.
+3. **Dynamische KI-Entscheidungen:** Anstatt starrer Schlüsselwörter entscheidet ein LLM im Hintergrund aus dem Kontext deiner Nachrichten, welche Aktionen oder Missionen der Agent ausführen soll.
+4. **Proaktivität & Vorschläge:** Die Agenten denken mit! Sie schlagen von sich aus die nächsten sinnvollen Schritte vor – oft musst du einfach nur noch mit einem kurzen "Ja" bestätigen. Wenn du längere Zeit nicht im Chat aktiv warst, melden sich die Agenten auch proaktiv bei dir.
+5. **Wirtschaft & Fortschritt:** Durch erfolgreiche Missionen sammeln die Agenten Beute (z.B. ins Inventar) und erwirtschaften Geld, wodurch du dein Setup weiter ausbauen und noch effizienter orchestrieren kannst.
 
 ## 🛠 Technologien
 
