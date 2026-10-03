@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Clock, Send, User, MessageSquare, LineChart, ShoppingCart, Search, Zap, Info, Users } from 'lucide-react';
+import { Package, Clock, Send, User, MessageSquare, LineChart, ShoppingCart, Search, Zap, Info, Trophy } from 'lucide-react';
 import { useGameStore } from './store/gameStore';
 import type { Item } from './types';
 import { t } from './i18n';
@@ -16,9 +16,9 @@ const generateRandomItem = (): Item => {
 
 function App() {
   const { 
-    money, moneyHistory, inventory, bots, missions, completeMission, 
+    money, tokens, moneyHistory, inventory, bots, missions, startMission, completeMission, 
     chatHistory, addChatMessage,
-    marketItems, buyMarketItem, agentSearchMarket,
+    marketItems, buyMarketItem, agentSearchMarket, sellItem, buyTokens,
     llmReady, llmLoadingText, initLLM, sendMessageToBotWithLLM
   } = useGameStore();
   const [tick, setTick] = useState(0);
@@ -27,11 +27,11 @@ function App() {
   const [typingBots, setTypingBots] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   
-  type TabType = 'dashboard' | 'chat' | 'cargo' | 'shop' | 'community' | 'account';
+  type TabType = 'dashboard' | 'chat' | 'depot' | 'shop' | 'community' | 'account';
 
   const getInitialTab = (): TabType => {
     const hash = window.location.hash.replace('#', '');
-    const validTabs: TabType[] = ['dashboard', 'chat', 'cargo', 'shop', 'community', 'account'];
+    const validTabs: TabType[] = ['dashboard', 'chat', 'depot', 'shop', 'community', 'account'];
     return validTabs.includes(hash as TabType) ? (hash as TabType) : 'dashboard';
   };
 
@@ -44,7 +44,7 @@ function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      const validTabs: TabType[] = ['dashboard', 'chat', 'cargo', 'shop', 'community', 'account'];
+      const validTabs: TabType[] = ['dashboard', 'chat', 'depot', 'shop', 'community', 'account'];
       if (validTabs.includes(hash as TabType)) {
         setActiveTab(hash as TabType);
       }
@@ -54,11 +54,11 @@ function App() {
   }, []);
 
   const mockedUsers = [
-    { id: '1', name: 'veri', level: 42, isOnline: true, color: 'bg-purple-500' },
-    { id: '2', name: 'sommerbist', level: 38, isOnline: true, color: 'bg-yellow-500' },
-    { id: '3', name: 'tracemaker', level: 55, isOnline: false, color: 'bg-green-500' },
-    { id: '4', name: 'neo', level: 12, isOnline: true, color: 'bg-blue-500' },
-    { id: '5', name: 'trinity', level: 27, isOnline: false, color: 'bg-red-500' }
+    { id: '3', name: 'tracemaker', revenue: 45200, isOnline: false, color: 'bg-green-500' },
+    { id: '1', name: 'veri', revenue: 38400, isOnline: true, color: 'bg-purple-500' },
+    { id: '2', name: 'sommerbist', revenue: 21500, isOnline: true, color: 'bg-yellow-500' },
+    { id: '5', name: 'trinity', revenue: 14200, isOnline: false, color: 'bg-red-500' },
+    { id: '4', name: 'neo', revenue: 3500, isOnline: true, color: 'bg-blue-500' }
   ];
 
   // Auto-initialize LLM on startup
@@ -107,7 +107,7 @@ function App() {
       setTypingBots(prev => [...prev, targetBotId]);
       setTimeout(() => {
         setTypingBots(prev => prev.filter(id => id !== targetBotId));
-        addChatMessage({ senderId: targetBotId, text: "AI Core is offline. Please initialize first." });
+        addChatMessage({ senderId: targetBotId, text: "KI-Kern ist offline. Bitte zuerst initialisieren." });
       }, 1000);
       return;
     }
@@ -120,32 +120,46 @@ function App() {
   const activeBot = bots.find(b => b.id === activeBotId);
   const activeBotMessages = chatHistory.filter(m => m.senderId === activeBotId || m.senderId === 'player');
 
-  // Avatar component using OpenAI Dots geometric abstract style
-  const BotAvatar = ({ botId, size = 'sm', pulse = false }: { botId?: string, size?: 'sm' | 'md' | 'lg', pulse?: boolean }) => {
+  // Avatar component using actual images from store
+  const BotAvatar = ({ botId, size = 'sm', showStatus = false }: { botId?: string, size?: 'sm' | 'md' | 'lg', showStatus?: boolean }) => {
     const sizeClasses = {
       sm: 'w-6 h-6',
       md: 'w-8 h-8',
       lg: 'w-10 h-10'
     };
     
-    // Sleek geometric colors from the screenshot
-    const colors = {
-      'bot-1': 'bg-[#40b8a6]', // teal
-      'bot-2': 'bg-[#f49336]', // orange
-      'default': 'bg-[#3b82f6]' // blue
+    const statusDotClasses = {
+      sm: 'w-2 h-2 -bottom-0.5 -right-0.5 border',
+      md: 'w-2.5 h-2.5 -bottom-0.5 -right-0.5 border-2',
+      lg: 'w-3 h-3 -bottom-0.5 -right-0.5 border-2'
     };
-    const bgColor = botId && colors[botId as keyof typeof colors] ? colors[botId as keyof typeof colors] : colors['default'];
+    
+    const bot = bots.find(b => b.id === botId);
+
+    const getStatusColor = () => {
+      if (!bot) return 'bg-gray-400';
+      if (bot.status === 'on_mission') return 'bg-red-500';
+      return 'bg-green-500';
+    };
 
     return (
-      <div className={`relative flex items-center justify-center rounded-full ${sizeClasses[size]} ${bgColor} shrink-0 overflow-hidden ${pulse ? 'animate-pulse' : ''} shadow-sm`}>
-         <div className="absolute top-[22%] left-[28%] w-[16%] h-[38%] bg-white rounded-full rotate-[25deg]" />
-         <div className="absolute top-[32%] right-[28%] w-[16%] h-[38%] bg-white rounded-full rotate-[25deg]" />
+      <div className={`relative ${sizeClasses[size]} shrink-0`}>
+        <div className="w-full h-full flex items-center justify-center rounded-full overflow-hidden shadow-sm bg-gray-100">
+          {bot?.avatar ? (
+            <img src={bot.avatar} alt="Avatar" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gray-200" />
+          )}
+        </div>
+        {showStatus && bot && (
+          <div className={`absolute rounded-full border-white ${getStatusColor()} ${statusDotClasses[size]}`} />
+        )}
       </div>
     );
   };
 
   const PortfolioChart = ({ data }: { data: { time: number, amount: number }[] }) => {
-    if (data.length < 2) return <div className="h-40 flex items-center justify-center text-gray-400 text-sm">Not enough data</div>;
+    if (data.length < 2) return <div className="h-40 flex items-center justify-center text-gray-400 text-sm">Nicht genug Daten</div>;
     
     const minAmount = Math.min(...data.map(d => d.amount));
     const maxAmount = Math.max(...data.map(d => d.amount));
@@ -189,8 +203,9 @@ function App() {
           <h1 className="text-lg font-medium text-gray-900 tracking-tight">
             {t('agentCrew')}
           </h1>
-          <div className="flex items-center">
+          <div className="flex items-center gap-4">
              <span className="text-sm font-medium text-gray-900">${money.toLocaleString('de-DE')}</span>
+             <span className="text-sm font-medium text-blue-600">🪙 {tokens}</span>
           </div>
         </header>
 
@@ -202,19 +217,35 @@ function App() {
             <div className="flex flex-col h-full bg-white overflow-y-auto px-6 py-4 space-y-6">
               <h2 className="text-xl font-medium text-black">{t('dashboard')}</h2>
               
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm text-gray-500">{t('totalBalance')}</p>
-                <div className="text-4xl font-medium text-black tracking-tight">
-                  ${money.toLocaleString('de-DE')}
-                </div>
-                {moneyHistory.length > 1 && (
-                  <div className={`text-sm font-medium ${moneyHistory[moneyHistory.length - 1].amount >= moneyHistory[0].amount ? 'text-green-500' : 'text-red-500'}`}>
-                    {moneyHistory[moneyHistory.length - 1].amount >= moneyHistory[0].amount ? '+' : ''}
-                    {(moneyHistory[moneyHistory.length - 1].amount - moneyHistory[0].amount).toLocaleString('de-DE')} ({(
-                      ((moneyHistory[moneyHistory.length - 1].amount - moneyHistory[0].amount) / moneyHistory[0].amount) * 100
-                    ).toFixed(2)}%)
+              <div className="flex gap-8">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm text-gray-500">{t('totalBalance')}</p>
+                  <div className="text-4xl font-medium text-black tracking-tight">
+                    ${money.toLocaleString('de-DE')}
                   </div>
-                )}
+                  {moneyHistory.length > 1 && (
+                    <div className={`text-sm font-medium ${moneyHistory[moneyHistory.length - 1].amount >= moneyHistory[0].amount ? 'text-green-500' : 'text-red-500'}`}>
+                      {moneyHistory[moneyHistory.length - 1].amount >= moneyHistory[0].amount ? '+' : ''}
+                      {(moneyHistory[moneyHistory.length - 1].amount - moneyHistory[0].amount).toLocaleString('de-DE')} ({(
+                        ((moneyHistory[moneyHistory.length - 1].amount - moneyHistory[0].amount) / moneyHistory[0].amount) * 100
+                      ).toFixed(2)}%)
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm text-gray-500">Tokens</p>
+                  <div className="text-4xl font-medium text-blue-600 tracking-tight flex items-center gap-2">
+                    <span className="text-2xl">🪙</span>
+                    {tokens}
+                  </div>
+                  <button 
+                    onClick={() => buyTokens(500, 50)}
+                    className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-md mt-1 hover:bg-blue-100 transition-colors w-fit"
+                  >
+                    +500 ($50)
+                  </button>
+                </div>
               </div>
 
               <div className="bg-gray-50 rounded-3xl p-4">
@@ -238,7 +269,7 @@ function App() {
                   </button>
                   
                   <button 
-                    onClick={() => setActiveTab('cargo')}
+                    onClick={() => setActiveTab('depot')}
                     className="flex flex-col text-left bg-white border border-gray-100 hover:border-gray-300 p-4 rounded-2xl transition-all shadow-sm hover:shadow-md"
                   >
                     <div className="flex items-center gap-2 mb-1">
@@ -256,7 +287,7 @@ function App() {
                 <h3 className="text-[13px] font-medium text-gray-400 uppercase tracking-wider">{t('statistics')}</h3>
                 <div className="flex flex-col gap-4">
                   <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                    <span className="text-[15px] text-gray-600">{t('cargoValue')}</span>
+                    <span className="text-[15px] text-gray-600">{t('depotValue')}</span>
                     <span className="text-[15px] text-black font-medium">
                       ${inventory.reduce((sum, item) => sum + item.baseValue, 0).toLocaleString('de-DE')}
                     </span>
@@ -290,37 +321,49 @@ function App() {
                         : 'bg-transparent text-gray-500 hover:text-black hover:bg-gray-50'
                     }`}
                   >
-                    <BotAvatar botId={bot.id} size="md" pulse={bot.status === 'on_mission'} />
+                    <BotAvatar botId={bot.id} size="md" showStatus={true} />
                     <span className="text-[15px]">{bot.name.split(' ')[0]}</span>
                   </button>
                 ))}
               </div>
 
               {/* Chat Messages */}
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6 z-10">
+              <div 
+                className="flex-1 overflow-y-auto px-6 py-4 space-y-6 z-10"
+                onClick={(e) => {
+                  const target = e.target as HTMLElement;
+                  const btn = target.closest('button[data-action]');
+                  if (btn) {
+                    const actionText = btn.getAttribute('data-action');
+                    if (actionText) {
+                      sendMessageToBotWithLLM(activeBotId, actionText, 'player');
+                    }
+                  }
+                }}
+              >
                 {!llmReady && (
                   <div className="bg-gray-50 border border-gray-100 p-5 rounded-2xl flex flex-col items-center justify-center text-center space-y-3 mb-6">
                     <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
                       <MessageSquare className="w-5 h-5 text-gray-400" />
                     </div>
                     <div>
-                      <h3 className="text-[15px] font-medium text-black">AI Core Offline</h3>
-                      <p className="text-[13px] text-gray-500 mt-1 max-w-[200px] mx-auto">Initialize the local LLM for smart chat.</p>
+                      <h3 className="text-[15px] font-medium text-black">KI-Kern Offline</h3>
+                      <p className="text-[13px] text-gray-500 mt-1 max-w-[200px] mx-auto">Initialisiere lokales LLM für intelligenten Chat.</p>
                     </div>
                     {llmLoadingText ? (
                       <div className="flex flex-col items-center space-y-2">
-                        <div className={`text-[11px] font-mono ${llmLoadingText.startsWith('Init Error') ? 'text-red-500 bg-red-50' : 'text-gray-500 bg-gray-100'} px-3 py-2 rounded-lg max-w-full break-all`}>
+                        <div className={`text-[11px] font-mono ${llmLoadingText.startsWith('Init Fehler') ? 'text-red-500 bg-red-50' : 'text-gray-500 bg-gray-100'} px-3 py-2 rounded-lg max-w-full break-all`}>
                           {llmLoadingText}
                         </div>
-                        {llmLoadingText.startsWith('Init Error') && (
+                        {llmLoadingText.startsWith('Init Fehler') && (
                           <button onClick={initLLM} className="bg-black hover:bg-gray-800 text-white text-[11px] font-medium px-4 py-1.5 rounded-full transition-colors mt-2">
-                            Retry Initialization
+                            Initialisierung wiederholen
                           </button>
                         )}
                       </div>
                     ) : (
                       <button onClick={initLLM} className="bg-black hover:bg-gray-800 text-white text-[13px] font-medium px-5 py-2.5 rounded-full transition-colors mt-2">
-                        Initialize Llama-3.2
+                        Llama-3.2 initialisieren
                       </button>
                     )}
                   </div>
@@ -333,7 +376,7 @@ function App() {
                       <div className={`flex gap-3 max-w-[85%] ${isPlayer ? 'flex-row-reverse' : 'flex-row'}`}>
                         {!isPlayer && (
                           <div className="mt-1 shrink-0">
-                             <BotAvatar botId={activeBotId} size="md" />
+                             <BotAvatar botId={activeBotId} size="md" showStatus={true} />
                           </div>
                         )}
                         <div className={`flex flex-col ${isPlayer ? 'items-end' : 'items-start'}`}>
@@ -342,7 +385,14 @@ function App() {
                               ? 'bg-gray-100 text-black' 
                               : 'bg-white border border-gray-200 text-gray-800'
                           }`}>
-                            <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.text}</p>
+                            {isPlayer ? (
+                              <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.text}</p>
+                            ) : (
+                              <div 
+                                className="whitespace-pre-wrap text-[15px] leading-relaxed chat-html-content"
+                                dangerouslySetInnerHTML={{ __html: msg.text }}
+                              />
+                            )}
                           </div>
                         </div>
                       </div>
@@ -362,11 +412,20 @@ function App() {
                   </div>
                 )}
                 
-                {activeBot?.status === 'on_mission' && (
+                {activeBot?.status === 'on_mission' ? (
                   <div className="flex items-center justify-center mt-6 mb-2">
                     <span className="text-xs text-gray-500 flex items-center gap-2">
                       <Clock className="w-3 h-3 animate-spin" /> {t('inProgress')}
                     </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center mt-6 mb-2">
+                    <button 
+                      onClick={() => activeBot && startMission(activeBot.id, 10000)}
+                      className="bg-gray-100 hover:bg-gray-200 text-black px-4 py-2 rounded-full text-xs font-medium transition-colors"
+                    >
+                      {t('startMission')}
+                    </button>
                   </div>
                 )}
                 <div ref={chatEndRef} className="h-4" />
@@ -394,11 +453,11 @@ function App() {
             </div>
           )}
 
-          {/* --- CARGO / INVENTORY TAB --- */}
-          {activeTab === 'cargo' && (
+          {/* --- DEPOT / INVENTORY TAB --- */}
+          {activeTab === 'depot' && (
             <div className="flex flex-col h-full bg-white overflow-y-auto px-6 py-4 space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-medium text-black">{t('cargo')}</h2>
+                <h2 className="text-xl font-medium text-black">{t('depot')}</h2>
                 <span className="text-sm text-gray-500">{inventory.length} {t('itemsCount')}</span>
               </div>
 
@@ -417,13 +476,21 @@ function App() {
                         </div>
                         <div>
                           <h3 className="text-[15px] font-medium text-black">{item.name}</h3>
-                          <p className="text-xs text-gray-500 capitalize">{item.rarity}</p>
+                          <p className="text-xs text-gray-500 capitalize">{t(item.rarity as any)}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-[15px] font-medium text-black">
-                          ${item.baseValue.toLocaleString('de-DE')}
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-[15px] font-medium text-black">
+                            ${item.baseValue.toLocaleString('de-DE')}
+                          </div>
                         </div>
+                        <button 
+                          onClick={() => sellItem(item.id)}
+                          className="bg-gray-100 hover:bg-gray-200 text-black px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          {t('sell')}
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -483,7 +550,7 @@ function App() {
                             </div>
                             <div>
                               <h3 className="text-[14px] font-medium text-black">{mkt.item.name}</h3>
-                              <p className="text-[11px] text-gray-500 capitalize">{mkt.item.rarity} • {t('seller')}: {mkt.sellerName}</p>
+                              <p className="text-[11px] text-gray-500 capitalize">{t(mkt.item.rarity as any)} • {t('seller')}: {mkt.sellerName}</p>
                             </div>
                           </div>
                           <div className="text-right">
@@ -516,9 +583,12 @@ function App() {
               </div>
               
               <div className="grid grid-cols-1 gap-3">
-                {mockedUsers.map(user => (
+                {mockedUsers.map((user, index) => (
                   <div key={user.id} className="flex items-center justify-between bg-white border border-gray-100 p-4 rounded-2xl hover:border-gray-200 transition-colors">
                     <div className="flex items-center gap-4">
+                      <div className="w-6 text-center text-gray-400 font-medium">
+                        #{index + 1}
+                      </div>
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${user.color}`}>
                         {user.name.charAt(0).toUpperCase()}
                       </div>
@@ -527,7 +597,7 @@ function App() {
                           <h3 className="text-[15px] font-medium text-black">{user.name}</h3>
                           <div className={`w-2 h-2 rounded-full ${user.isOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
                         </div>
-                        <p className="text-xs text-gray-500">{t('level')} {user.level}</p>
+                        <p className="text-xs text-gray-500">{t('revenue')}: ${user.revenue.toLocaleString('de-DE')}</p>
                       </div>
                     </div>
                   </div>
@@ -571,7 +641,7 @@ function App() {
                     <span className="text-[15px] text-black font-medium">{inventory.length}</span>
                   </div>
                   <div className="flex justify-between items-center py-2">
-                    <span className="text-[15px] text-gray-600">{t('cargoValue')}</span>
+                    <span className="text-[15px] text-gray-600">{t('depotValue')}</span>
                     <span className="text-[15px] text-black font-medium">
                       ${inventory.reduce((sum, item) => sum + item.baseValue, 0).toLocaleString('de-DE')}
                     </span>
@@ -602,8 +672,8 @@ function App() {
           </button>
           
           <button 
-            onClick={() => setActiveTab('cargo')}
-            className={`flex flex-col items-center justify-center w-full h-full space-y-1.5 transition-colors ${activeTab === 'cargo' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
+            onClick={() => setActiveTab('depot')}
+            className={`flex flex-col items-center justify-center w-full h-full space-y-1.5 transition-colors ${activeTab === 'depot' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
           >
             <div className="relative">
               <Package className="w-6 h-6 stroke-1" />
@@ -611,7 +681,7 @@ function App() {
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-black rounded-full border-2 border-white"></span>
               )}
             </div>
-            <span className="text-[11px] font-medium">{t('cargo')}</span>
+            <span className="text-[11px] font-medium">{t('depot')}</span>
           </button>
           
           <button 
@@ -626,7 +696,7 @@ function App() {
             onClick={() => setActiveTab('community')}
             className={`flex flex-col items-center justify-center w-full h-full space-y-1.5 transition-colors ${activeTab === 'community' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
           >
-            <Users className="w-6 h-6 stroke-1" />
+            <Trophy className="w-6 h-6 stroke-1" />
             <span className="text-[11px] font-medium">{t('community')}</span>
           </button>
 

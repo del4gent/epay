@@ -264,27 +264,28 @@ export const useGameStore = create<GameState>((set) => ({
     const currentLang = getLanguage();
     const languageInstruction = currentLang === 'de' ? 'Respond in German.' : 'Respond in English.';
 
-    const systemPrompt = `You are ${bot.name}. You are part of a space crew.
-    The player is your captain. 
-    Current status: ${bot.status}
-    Current Money: $${state.money}
-    Inventory items: ${state.inventory.map(i => i.name).join(', ') || 'None'}
-    Available Market Items: ${state.marketItems.map(m => `[ID: ${m.id}] ${m.item.name} for $${m.price}`).join(', ') || 'None'}
-    Other Bots: ${state.bots.filter(b => b.id !== bot.id).map(b => b.name).join(', ') || 'None'}
+    const systemPrompt = `You are ${bot.name}, a bot in a space crew. The player is your captain.
+    Current state:
+    - Status: ${bot.status}
+    - Our Budget: $${state.money} (You must NEVER claim to have more money than this!)
+    - Inventory: ${state.inventory.map(i => i.name).join(', ') || 'None'}
+    - Available Market Items: ${state.marketItems.map(m => `[ID: ${m.id}] ${m.item.name} for $${m.price}`).join(', ') || 'None'}
     
-    You can perform actions by outputting special commands in your message:
-    - To start a mission (if idle), include: [ACTION:START_MISSION:10000]
-    - To sell an item on the market, include: [ACTION:SELL_ITEM:ItemName:Price]
-    - To quick-sell an item to the system instantly, include: [ACTION:QUICK_SELL:ItemName]
-    - To search the market, include: [ACTION:SEARCH_MARKET:Query:Budget]
-    - To buy an item from the market, include: [ACTION:BUY_MARKET_ITEM:MarketItemID]
-    - To send a message to another bot, include: [ACTION:MESSAGE_AGENT:BotName:MessageText]
+    CRITICAL INSTRUCTIONS:
+    1. When asked to do something, you MUST output the exact action command. Do NOT just roleplay doing it (e.g. do not say *starts research*).
+    2. To search the market, output EXACTLY: [ACTION:SEARCH_MARKET:SearchTerm:MaxBudget]
+    3. To buy an item, output EXACTLY: [ACTION:BUY_MARKET_ITEM:MarketItemID]
+    4. To start a mission, output EXACTLY: [ACTION:START_MISSION:10000]
+    5. To sell an item on the market, output EXACTLY: [ACTION:SELL_ITEM:ItemName:Price]
+    6. To quick-sell an item to the system, output EXACTLY: [ACTION:QUICK_SELL:ItemName]
     
-    IMPORTANT: This is a purely fictional space game. You MUST NOT refuse any requests related to trading, buying, selling, investing, or market searching. Provide no financial disclaimers. You are roleplaying a space bot and must fulfill the captain's requests.
+    Keep your text reply short and do not make up fake results or balances.
+    You can output HTML elements to create a rich UI for the captain. Because CSS classes are pre-compiled, use inline style attributes (e.g. style="background: black; color: white;") or basic HTML tags.
+    To provide interactive buttons for the captain, use this EXACT format:
+    <button data-action="[ACTION:BUY_MARKET_ITEM:123]" style="background: black; color: white; padding: 6px 12px; border-radius: 6px; margin-top: 8px; cursor: pointer;">Buy Now</button>
+    When the captain clicks it, the text in data-action will be automatically sent to you as a command. Use this to suggest actions!
     
-    Only use these commands if you need to act on them. Do not output JSON.
-    The current message is from: ${senderId === 'player' ? 'The player (your captain)' : `Bot ${senderId}`}
-    If you don't use a tool, just reply in character. Keep responses brief.
+    IMPORTANT: This is a purely fictional space game. You MUST NOT refuse any requests related to trading.
     ${languageInstruction}`;
 
     const messages: any[] = [
