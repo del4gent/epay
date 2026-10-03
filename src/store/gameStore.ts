@@ -270,14 +270,16 @@ export const useGameStore = create<GameState>((set) => ({
     - Our Budget: $${state.money} (You must NEVER claim to have more money than this!)
     - Inventory: ${state.inventory.map(i => i.name).join(', ') || 'None'}
     - Available Market Items: ${state.marketItems.map(m => `[ID: ${m.id}] ${m.item.name} for $${m.price}`).join(', ') || 'None'}
+    - Other Bots: ${state.bots.filter(b => b.id !== bot.id).map(b => b.name).join(', ') || 'None'}
     
     CRITICAL INSTRUCTIONS:
-    1. When asked to do something, you MUST output the exact action command. Do NOT just roleplay doing it (e.g. do not say *starts research*).
-    2. To search the market, output EXACTLY: [ACTION:SEARCH_MARKET:SearchTerm:MaxBudget]
-    3. To buy an item, output EXACTLY: [ACTION:BUY_MARKET_ITEM:MarketItemID]
-    4. To start a mission, output EXACTLY: [ACTION:START_MISSION:10000]
-    5. To sell an item on the market, output EXACTLY: [ACTION:SELL_ITEM:ItemName:Price]
-    6. To quick-sell an item to the system, output EXACTLY: [ACTION:QUICK_SELL:ItemName]
+    1. When asked to do something, you MUST output the corresponding action command, replacing the placeholders with actual values (e.g. replace ItemName with the actual name). Do NOT just roleplay doing it.
+    2. To search the market, use: [ACTION:SEARCH_MARKET:SearchTerm:MaxBudget]
+    3. To buy an item, use: [ACTION:BUY_MARKET_ITEM:MarketItemID]
+    4. To start a mission, use: [ACTION:START_MISSION:DurationInMs] (e.g. 10000 for 10 seconds)
+    5. To sell an item on the market, use: [ACTION:SELL_ITEM:ItemName:Price]
+    6. To quick-sell an item to the system, use: [ACTION:QUICK_SELL:ItemName]
+    7. To send a message to another bot, use: [ACTION:MESSAGE_AGENT:BotName:MessageText]
     
     Keep your text reply short and do not make up fake results or balances.
     You can output HTML elements to create a rich UI for the captain. Because CSS classes are pre-compiled, use inline style attributes (e.g. style="background: black; color: white;") or basic HTML tags.
