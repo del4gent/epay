@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environments
+.env
+.env.*
+!.env.example
+
+# Temporary and Patch files
+*.patch
+patch.js
