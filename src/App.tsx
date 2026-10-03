@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Clock, Send, User, MessageSquare } from 'lucide-react';
+import { Package, Clock, Send, User, MessageSquare, LineChart } from 'lucide-react';
 import { useGameStore } from './store/gameStore';
 import type { Item } from './types';
 import { t } from './i18n';
@@ -15,14 +15,18 @@ const generateRandomItem = (): Item => {
 };
 
 function App() {
-  const { money, inventory, bots, missions, startMission, completeMission, chatHistory, addChatMessage } = useGameStore();
+  const { 
+    money, moneyHistory, inventory, bots, missions, completeMission, 
+    chatHistory, addChatMessage,
+    llmReady, llmLoadingText, initLLM, sendMessageToBotWithLLM
+  } = useGameStore();
   const [tick, setTick] = useState(0);
   const [activeBotId, setActiveBotId] = useState<string>(bots[0].id);
   const [chatInput, setChatInput] = useState('');
   const [typingBots, setTypingBots] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   
-  const [activeTab, setActiveTab] = useState<'chat' | 'cargo' | 'account'>('chat');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'cargo' | 'account'>('dashboard');
 
   // Global Game Tick
   useEffect(() => {
@@ -51,33 +55,27 @@ function App() {
     }
   }, [chatHistory, activeBotId, typingBots, activeTab]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
-    addChatMessage({ senderId: 'player', text: chatInput });
-    
-    const inputLower = chatInput.toLowerCase();
-    const targetBot = bots.find(b => b.id === activeBotId);
-    const botIdToReply = activeBotId;
-    
-    setTypingBots(prev => [...prev, botIdToReply]);
-
-    setTimeout(() => {
-      setTypingBots(prev => prev.filter(id => id !== botIdToReply));
-      if (inputLower.includes('mission') || inputLower.includes('deploy') || inputLower.includes('go')) {
-        if (targetBot?.status === 'idle') {
-          addChatMessage({ senderId: botIdToReply, text: t('launchSequence') });
-          startMission(botIdToReply, 5000);
-        } else {
-          addChatMessage({ senderId: botIdToReply, text: t('alreadyOnMission') });
-        }
-      } else {
-        addChatMessage({ senderId: botIdToReply, text: t('acknowledged') });
-      }
-    }, 1500);
-
+    const input = chatInput;
     setChatInput('');
+    const targetBotId = activeBotId;
+
+    if (!llmReady) {
+      addChatMessage({ senderId: 'player', text: input });
+      setTypingBots(prev => [...prev, targetBotId]);
+      setTimeout(() => {
+        setTypingBots(prev => prev.filter(id => id !== targetBotId));
+        addChatMessage({ senderId: targetBotId, text: "AI Core is offline. Please initialize first." });
+      }, 1000);
+      return;
+    }
+
+    setTypingBots(prev => [...prev, targetBotId]);
+    await sendMessageToBotWithLLM(targetBotId, input);
+    setTypingBots(prev => prev.filter(id => id !== targetBotId));
   };
 
   const activeBot = bots.find(b => b.id === activeBotId);
@@ -107,6 +105,42 @@ function App() {
     );
   };
 
+  const PortfolioChart = ({ data }: { data: { time: number, amount: number }[] }) => {
+    if (data.length < 2) return <div className="h-40 flex items-center justify-center text-gray-400 text-sm">Not enough data</div>;
+    
+    const minAmount = Math.min(...data.map(d => d.amount));
+    const maxAmount = Math.max(...data.map(d => d.amount));
+    const padding = (maxAmount - minAmount) * 0.1 || 10;
+    const yMin = Math.max(0, minAmount - padding);
+    const yMax = maxAmount + padding;
+    
+    const startTime = data[0].time;
+    const endTime = data[data.length - 1].time;
+    const timeSpan = endTime - startTime || 1;
+    
+    const getX = (time: number) => ((time - startTime) / timeSpan) * 100;
+    const getY = (amount: number) => 100 - (((amount - yMin) / (yMax - yMin)) * 100);
+    
+    const points = data.map(d => `${getX(d.time)},${getY(d.amount)}`).join(' ');
+    
+    const isPositive = data[data.length - 1].amount >= data[0].amount;
+    const strokeColor = isPositive ? '#22c55e' : '#ef4444'; // green-500 or red-500
+
+    return (
+      <div className="w-full h-40 relative">
+        <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
+          <polyline
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="2"
+            points={points}
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      </div>
+    );
+  };
+
   return (
     <div className="flex justify-center bg-gray-100 min-h-screen font-sans text-gray-900">
       <div className="w-full max-w-md bg-white shadow-xl flex flex-col h-[100dvh] relative overflow-hidden">
@@ -124,6 +158,52 @@ function App() {
         {/* MAIN CONTENT AREA */}
         <main className="flex-1 overflow-hidden relative flex flex-col bg-white">
           
+          {/* --- DASHBOARD TAB --- */}
+          {activeTab === 'dashboard' && (
+            <div className="flex flex-col h-full bg-white overflow-y-auto px-6 py-4 space-y-6">
+              <h2 className="text-xl font-medium text-black">{t('dashboard')}</h2>
+              
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm text-gray-500">{t('totalBalance')}</p>
+                <div className="text-4xl font-medium text-black tracking-tight">
+                  ${money.toLocaleString('de-DE')}
+                </div>
+                {moneyHistory.length > 1 && (
+                  <div className={`text-sm font-medium ${moneyHistory[moneyHistory.length - 1].amount >= moneyHistory[0].amount ? 'text-green-500' : 'text-red-500'}`}>
+                    {moneyHistory[moneyHistory.length - 1].amount >= moneyHistory[0].amount ? '+' : ''}
+                    {(moneyHistory[moneyHistory.length - 1].amount - moneyHistory[0].amount).toLocaleString('de-DE')} ({(
+                      ((moneyHistory[moneyHistory.length - 1].amount - moneyHistory[0].amount) / moneyHistory[0].amount) * 100
+                    ).toFixed(2)}%)
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-gray-50 rounded-3xl p-4">
+                <PortfolioChart data={moneyHistory} />
+              </div>
+
+              <div className="space-y-4 pt-4">
+                <h3 className="text-[13px] font-medium text-gray-400 uppercase tracking-wider">{t('statistics')}</h3>
+                <div className="flex flex-col gap-4">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-[15px] text-gray-600">{t('cargoValue')}</span>
+                    <span className="text-[15px] text-black font-medium">
+                      ${inventory.reduce((sum, item) => sum + item.baseValue, 0).toLocaleString('de-DE')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-[15px] text-gray-600">{t('itemsFound')}</span>
+                    <span className="text-[15px] text-black font-medium">{inventory.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-[15px] text-gray-600">{t('uptime')}</span>
+                    <span className="text-[15px] text-black font-medium">{Math.floor(tick / 60)}m {tick % 60}s</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* --- CHAT TAB --- */}
           {activeTab === 'chat' && (
             <div className="flex flex-col h-full bg-white relative">
@@ -148,6 +228,27 @@ function App() {
 
               {/* Chat Messages */}
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6 z-10">
+                {!llmReady && (
+                  <div className="bg-gray-50 border border-gray-100 p-5 rounded-2xl flex flex-col items-center justify-center text-center space-y-3 mb-6">
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                      <MessageSquare className="w-5 h-5 text-gray-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-[15px] font-medium text-black">AI Core Offline</h3>
+                      <p className="text-[13px] text-gray-500 mt-1 max-w-[200px] mx-auto">Initialize the local LLM for smart chat.</p>
+                    </div>
+                    {llmLoadingText ? (
+                      <div className="text-[11px] font-mono text-gray-500 bg-gray-100 px-3 py-2 rounded-lg max-w-full break-all">
+                        {llmLoadingText}
+                      </div>
+                    ) : (
+                      <button onClick={initLLM} className="bg-black hover:bg-gray-800 text-white text-[13px] font-medium px-5 py-2.5 rounded-full transition-colors mt-2">
+                        Initialize Llama-3.2
+                      </button>
+                    )}
+                  </div>
+                )}
+                
                 {activeBotMessages.map(msg => {
                   const isPlayer = msg.senderId === 'player';
                   return (
@@ -303,6 +404,14 @@ function App() {
 
         {/* BOTTOM NAVIGATION BAR */}
         <nav className="flex justify-around items-center bg-white border-t border-gray-100 pb-safe pt-3 px-6 shrink-0 h-20">
+          <button 
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex flex-col items-center justify-center w-full h-full space-y-1.5 transition-colors ${activeTab === 'dashboard' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            <LineChart className="w-6 h-6 stroke-1" />
+            <span className="text-[11px] font-medium">{t('dashboard')}</span>
+          </button>
+
           <button 
             onClick={() => setActiveTab('chat')}
             className={`flex flex-col items-center justify-center w-full h-full space-y-1.5 transition-colors ${activeTab === 'chat' ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}

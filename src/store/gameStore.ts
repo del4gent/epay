@@ -12,6 +12,7 @@ interface GameState {
   bots: Bot[];
   missions: Mission[];
   chatHistory: ChatMessage[];
+  moneyHistory: { time: number; amount: number }[];
   
   // Actions
   addMoney: (amount: number) => void;
@@ -44,8 +45,15 @@ export const useGameStore = create<GameState>((set) => ({
   bots: INITIAL_BOTS,
   missions: [],
   chatHistory: INITIAL_CHAT,
+  moneyHistory: [{ time: Date.now(), amount: 50 }],
 
-  addMoney: (amount) => set((state) => ({ money: state.money + amount })),
+  addMoney: (amount) => set((state) => {
+    const newMoney = state.money + amount;
+    return { 
+      money: newMoney,
+      moneyHistory: [...state.moneyHistory, { time: Date.now(), amount: newMoney }]
+    };
+  }),
 
   startMission: (botId, duration) => set((state) => {
     const endTime = Date.now() + duration;
@@ -76,8 +84,10 @@ export const useGameStore = create<GameState>((set) => ({
   sellListing: (listingId) => set((state) => {
     const listing = state.listings.find(l => l.id === listingId);
     if (!listing) return state;
+    const newMoney = state.money + listing.listedPrice;
     return {
-      money: state.money + listing.listedPrice,
+      money: newMoney,
+      moneyHistory: [...state.moneyHistory, { time: Date.now(), amount: newMoney }],
       listings: state.listings.filter(l => l.id !== listingId)
     };
   }),
