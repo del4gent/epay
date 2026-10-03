@@ -25,3 +25,10 @@ export type Mission = {
   botId: string;
   endTime: number;
 };
+
+export type ChatMessage = {
+  id: string;
+  senderId: string; // 'player' or botId
+  text: string;
+  timestamp: number;
+};

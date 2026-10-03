@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Item, Listing, Bot, Mission } from '../types';
+import type { Item, Listing, Bot, Mission, ChatMessage } from '../types';
 
 interface GameState {
   money: number;
@@ -7,6 +7,7 @@ interface GameState {
   listings: Listing[];
   bots: Bot[];
   missions: Mission[];
+  chatHistory: ChatMessage[];
   
   // Actions
   addMoney: (amount: number) => void;
@@ -14,10 +15,16 @@ interface GameState {
   completeMission: (missionId: string, reward: Item) => void;
   listItem: (item: Item, price: number) => void;
   sellListing: (listingId: string) => void;
+  addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
 }
 
 const INITIAL_BOTS: Bot[] = [
-  { id: 'bot-1', name: 'Scrap-Collector', level: 1, status: 'idle' }
+  { id: 'bot-1', name: 'Sparky (Engineer)', level: 1, status: 'idle' },
+  { id: 'bot-2', name: 'Nova (Navigator)', level: 1, status: 'idle' }
+];
+
+const INITIAL_CHAT: ChatMessage[] = [
+  { id: 'msg-1', senderId: 'bot-1', text: "Captain. Core temperature is stable, but we need more scrap to upgrade the hyperdrive.", timestamp: Date.now() - 10000 }
 ];
 
 export const useGameStore = create<GameState>((set) => ({
@@ -26,6 +33,7 @@ export const useGameStore = create<GameState>((set) => ({
   listings: [],
   bots: INITIAL_BOTS,
   missions: [],
+  chatHistory: INITIAL_CHAT,
 
   addMoney: (amount) => set((state) => ({ money: state.money + amount })),
 
@@ -63,4 +71,8 @@ export const useGameStore = create<GameState>((set) => ({
       listings: state.listings.filter(l => l.id !== listingId)
     };
   }),
+
+  addChatMessage: (msg) => set((state) => ({
+    chatHistory: [...state.chatHistory, { ...msg, id: `msg-${Date.now()}`, timestamp: Date.now() }]
+  }))
 }));

@@ -1,32 +1,40 @@
-# React + TypeScript + Vite
+# ePay
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Ein modernes Web-Projekt, basierend auf React, TypeScript und Vite.
 
-Currently, two official plugins are available:
+## 🛠 Technologien
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Frontend Framework:** [React 19](https://react.dev/)
+- **Build Tool:** [Vite 8](https://vitejs.dev/)
+- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
+- **State Management:** [Zustand](https://zustand-demo.pmnd.rs/)
+- **Animationen:** [Framer Motion](https://www.framer.com/motion/)
+- **Icons:** [Lucide React](https://lucide.dev/)
+- **Linting:** [Oxlint](https://oxc.rs/docs/guide/usage/linter)
 
-## React Compiler
+## 📦 Installation & Start
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. **Abhängigkeiten installieren:**
+   ```bash
+   npm install
+   ```
 
-## Expanding the Oxlint configuration
+2. **Entwicklungsserver starten:**
+   ```bash
+   npm run dev
+   ```
+   Die App ist dann standardmäßig unter `http://localhost:5173` erreichbar.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## 📜 Skripte
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+- `npm run dev`: Startet den lokalen Entwicklungsserver.
+- `npm run build`: Kompiliert TypeScript und erstellt den Produktions-Build.
+- `npm run lint`: Überprüft den Code mit Oxlint.
+- `npm run preview`: Startet eine lokale Vorschau des Produktions-Builds.
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## 🗂 Projektstruktur
+
+- `src/components/`: Wiederverwendbare UI-Komponenten
+- `src/store/`: Zustand-Store für lokales State-Management
+- `src/types/`: TypeScript-Typdefinitionen
+- `src/assets/`: Statische Assets (Bilder etc.)
