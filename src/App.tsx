@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DollarSign, Package, Terminal, Clock, Send, CheckCircle2, User } from 'lucide-react';
+import { DollarSign, Package, Terminal, Clock, Send, User } from 'lucide-react';
 import { useGameStore } from './store/gameStore';
 import type { Item } from './types';
 
@@ -14,10 +14,11 @@ const generateRandomItem = (): Item => {
 };
 
 function App() {
-  const { money, inventory, bots, missions, startMission, completeMission, listItem, listings, sellListing, chatHistory, addChatMessage } = useGameStore();
+  const { money, inventory, bots, missions, startMission, completeMission, chatHistory, addChatMessage } = useGameStore();
   const [tick, setTick] = useState(0);
   const [activeBotId, setActiveBotId] = useState<string>(bots[0].id);
   const [chatInput, setChatInput] = useState('');
+  const [typingBots, setTypingBots] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Global Game Tick
@@ -43,7 +44,7 @@ function App() {
   // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory, activeBotId]);
+  }, [chatHistory, activeBotId, typingBots]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,19 +56,23 @@ function App() {
     // Simple mock logic for "agent" responding
     const inputLower = chatInput.toLowerCase();
     const targetBot = bots.find(b => b.id === activeBotId);
+    const botIdToReply = activeBotId;
     
+    setTypingBots(prev => [...prev, botIdToReply]);
+
     setTimeout(() => {
+      setTypingBots(prev => prev.filter(id => id !== botIdToReply));
       if (inputLower.includes('mission') || inputLower.includes('deploy') || inputLower.includes('go')) {
         if (targetBot?.status === 'idle') {
-          addChatMessage({ senderId: activeBotId, text: `Copy that! Initiating launch sequence now. ETA 5 seconds.` });
-          startMission(activeBotId, 5000);
+          addChatMessage({ senderId: botIdToReply, text: `Copy that! Initiating launch sequence now. ETA 5 seconds.` });
+          startMission(botIdToReply, 5000);
         } else {
-          addChatMessage({ senderId: activeBotId, text: `I'm already on a mission, Captain! Wait until I get back.` });
+          addChatMessage({ senderId: botIdToReply, text: `I'm already on a mission, Captain! Wait until I get back.` });
         }
       } else {
-        addChatMessage({ senderId: activeBotId, text: `Acknowledged: "${chatInput}". (Hint: tell me to go on a "mission"!)` });
+        addChatMessage({ senderId: botIdToReply, text: `Acknowledged: "${chatInput}". (Hint: tell me to go on a "mission"!)` });
       }
-    }, 1000);
+    }, 1500);
 
     setChatInput('');
   };
@@ -98,9 +103,18 @@ function App() {
                 <button
                   key={bot.id}
                   onClick={() => setActiveBotId(bot.id)}
-                  className={`w-full text-left p-3 rounded-lg flex items-center justify-between border transition-colors ${activeBotId === bot.id ? 'bg-indigo-900/50 border-indigo-500 text-indigo-100' : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
+                  className={`w-full text-left p-2 rounded-lg flex items-center justify-between border transition-colors ${activeBotId === bot.id ? 'bg-indigo-900/50 border-indigo-500 text-indigo-100' : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
                 >
-                  <span className="font-medium text-sm">{bot.name}</span>
+                  <div className="flex items-center gap-3">
+                    {bot.avatar ? (
+                      <img src={bot.avatar} alt={bot.name} className="w-8 h-8 rounded-full object-cover border border-slate-600 shadow-sm" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center border border-slate-600">
+                        <User className="w-4 h-4 text-slate-400" />
+                      </div>
+                    )}
+                    <span className="font-medium text-sm">{bot.name}</span>
+                  </div>
                   <div className={`w-2 h-2 rounded-full ${bot.status === 'idle' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
                 </button>
               ))}
@@ -146,15 +160,37 @@ function App() {
               const isPlayer = msg.senderId === 'player';
               return (
                 <div key={msg.id} className={`flex flex-col ${isPlayer ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[80%] p-3 rounded-lg border ${isPlayer ? 'bg-indigo-900/40 border-indigo-800/50 text-indigo-100 rounded-br-none' : 'bg-emerald-900/20 border-emerald-800/30 text-emerald-400 rounded-bl-none'}`}>
-                    <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                  <div className={`flex gap-3 max-w-[85%] ${isPlayer ? 'flex-row-reverse' : 'flex-row'}`}>
+                    {!isPlayer && activeBot?.avatar && (
+                      <img src={activeBot.avatar} alt={activeBot.name} className="w-8 h-8 rounded-full border border-emerald-800 object-cover mt-1 shadow-md" />
+                    )}
+                    <div className={`flex flex-col ${isPlayer ? 'items-end' : 'items-start'}`}>
+                      <div className={`p-3 rounded-lg border ${isPlayer ? 'bg-indigo-900/40 border-indigo-800/50 text-indigo-100 rounded-br-none' : 'bg-emerald-900/20 border-emerald-800/30 text-emerald-400 rounded-bl-none'}`}>
+                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                      </div>
+                      <span className={`text-[10px] mt-1 text-slate-600 uppercase tracking-widest font-semibold ${isPlayer ? 'mr-1' : 'ml-1'}`}>
+                        {isPlayer ? 'Captain' : activeBot?.name}
+                      </span>
+                    </div>
                   </div>
-                  <span className={`text-[10px] mt-1 text-slate-600 uppercase tracking-widest font-semibold ${isPlayer ? 'mr-1' : 'ml-1'}`}>
-                    {isPlayer ? 'Captain' : activeBot?.name}
-                  </span>
                 </div>
               );
             })}
+            
+            {typingBots.includes(activeBotId) && (
+              <div className="flex flex-col items-start">
+                <div className="max-w-[80%] p-3 rounded-lg border bg-emerald-900/20 border-emerald-800/30 text-emerald-400 rounded-bl-none">
+                  <div className="flex gap-1.5 items-center py-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></span>
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></span>
+                  </div>
+                </div>
+                <span className="text-[10px] mt-1 text-slate-600 uppercase tracking-widest font-semibold ml-1">
+                  {activeBot?.name} IS TYPING...
+                </span>
+              </div>
+            )}
             
             {activeBot?.status === 'on_mission' && (
               <div className="flex items-center justify-center mt-4">

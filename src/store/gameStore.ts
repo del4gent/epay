@@ -19,8 +19,8 @@ interface GameState {
 }
 
 const INITIAL_BOTS: Bot[] = [
-  { id: 'bot-1', name: 'Sparky (Engineer)', level: 1, status: 'idle' },
-  { id: 'bot-2', name: 'Nova (Navigator)', level: 1, status: 'idle' }
+  { id: 'bot-1', name: 'Sparky (Engineer)', avatar: '/sparky.jpg', level: 1, status: 'idle' },
+  { id: 'bot-2', name: 'Nova (Navigator)', avatar: '/nova.jpg', level: 1, status: 'idle' }
 ];
 
 const INITIAL_CHAT: ChatMessage[] = [

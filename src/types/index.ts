@@ -15,6 +15,7 @@ export type Listing = {
 export type Bot = {
   id: string;
   name: string;
+  avatar?: string;
   level: number;
   status: 'idle' | 'on_mission';
   missionEndTime?: number;
