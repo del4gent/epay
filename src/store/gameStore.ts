@@ -7,6 +7,7 @@ import { t, getLanguage } from '../i18n';
 
 interface GameState {
   money: number;
+  tokens: number;
   inventory: Item[];
   listings: Listing[];
   bots: Bot[];
@@ -17,10 +18,13 @@ interface GameState {
   
   // Actions
   addMoney: (amount: number) => void;
+  consumeTokens: (amount: number) => void;
+  buyTokens: (amount: number, cost: number) => void;
   startMission: (botId: string, duration: number) => void;
   completeMission: (missionId: string, reward: Item) => void;
   listItem: (item: Item, price: number) => void;
   sellListing: (listingId: string) => void;
+  sellItem: (itemId: string) => void;
   addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   buyMarketItem: (marketItemId: string) => void;
   agentSearchMarket: (botId: string, budget?: number, query?: string) => void;
@@ -43,34 +47,58 @@ const INITIAL_MISSIONS: Mission[] = [
 
 const INITIAL_CHAT: ChatMessage[] = [
   { id: 'msg-1', senderId: 'bot-1', text: t('initialChat'), timestamp: Date.now() - 10000 },
-  { id: 'msg-2', senderId: 'bot-2', text: 'Scouting sector 7 for supplies. Be back soon!', timestamp: Date.now() - 5000 }
+  { id: 'msg-2', senderId: 'bot-2', text: 'Erkunde Sektor 7 nach Vorräten. Bin bald zurück!', timestamp: Date.now() - 5000 }
 ];
 
 const INITIAL_MARKET_ITEMS: import('../types').MarketItem[] = [
   {
     id: 'mkt-1',
-    item: { id: 'item-m1', name: 'Plasma Injector', baseValue: 120, rarity: 'rare' },
-    price: 150,
-    sellerName: 'StarTrader99'
+    item: { id: 'item-stk1', name: 'Wirecard-Aktie (Garantiert sicher!)', baseValue: 1, rarity: 'common' },
+    price: 2,
+    sellerName: 'JanM'
   },
   {
     id: 'mkt-2',
-    item: { id: 'item-m2', name: 'Scrap Metal', baseValue: 5, rarity: 'common' },
-    price: 8,
-    sellerName: 'JunkerBob'
+    item: { id: 'item-stk2', name: 'Gebrauchter DogeCoin', baseValue: 69, rarity: 'uncommon' },
+    price: 420,
+    sellerName: 'ElonM_Fan99'
   },
   {
     id: 'mkt-3',
-    item: { id: 'item-m3', name: 'Contraband Chip', baseValue: 500, rarity: 'illegal' },
+    item: { id: 'item-stk3', name: 'Blockbuster-Aktie (Vintage)', baseValue: 500, rarity: 'epic' },
     price: 800,
-    sellerName: 'ShadowBroker'
+    sellerName: 'RetroInvest'
+  },
+  {
+    id: 'mkt-4',
+    item: { id: 'item-stk4', name: 'Tulpenzwiebel (Der originale Bitcoin)', baseValue: 150, rarity: 'rare' },
+    price: 200,
+    sellerName: 'DutchTrader_1637'
+  },
+  {
+    id: 'mkt-5',
+    item: { id: 'item-stk5', name: 'ToTheMoon-Coin 🚀🚀🚀', baseValue: 0, rarity: 'common' },
+    price: 10,
+    sellerName: 'DiamondHands'
+  },
+  {
+    id: 'mkt-6',
+    item: { id: 'item-stk6', name: 'Geheimer Insider-Tipp vom Cousin', baseValue: 50, rarity: 'illegal' },
+    price: 300,
+    sellerName: 'TrustMeBro'
+  },
+  {
+    id: 'mkt-7',
+    item: { id: 'item-stk7', name: 'FTX Token (Nur leichter Wasserschaden)', baseValue: -10, rarity: 'common' },
+    price: 5,
+    sellerName: 'SBF_Official'
   }
 ];
 
 const INITIAL_INVENTORY: Item[] = [
-  { id: 'item-inv-1', name: 'Scrap Metal', baseValue: 5, rarity: 'common' },
-  { id: 'item-inv-2', name: 'Quantum Processor', baseValue: 120, rarity: 'rare' },
-  { id: 'item-inv-3', name: 'Hyperdrive Core', baseValue: 450, rarity: 'rare' }
+  { id: 'item-inv-1', name: 'Altmetall', baseValue: 5, rarity: 'common' },
+  { id: 'item-inv-2', name: 'Quantenprozessor', baseValue: 120, rarity: 'rare' },
+  { id: 'item-inv-3', name: 'Hyperantrieb-Kern', baseValue: 450, rarity: 'rare' }
 ];
 
 const INITIAL_MONEY_HISTORY = [
@@ -83,6 +111,7 @@ const INITIAL_MONEY_HISTORY = [
 
 export const useGameStore = create<GameState>((set) => ({
   money: 500, // increased starting money to test shop
+  tokens: 1000,
   inventory: INITIAL_INVENTORY,
   listings: [],
   bots: INITIAL_BOTS,
@@ -90,6 +119,19 @@ export const useGameStore = create<GameState>((set) => ({
   chatHistory: INITIAL_CHAT,
   moneyHistory: INITIAL_MONEY_HISTORY,
   marketItems: INITIAL_MARKET_ITEMS,
+
+  consumeTokens: (amount) => set((state) => ({ tokens: Math.max(0, state.tokens - amount) })),
+  buyTokens: (amount, cost) => set((state) => {
+    if (state.money >= cost) {
+      const newMoney = state.money - cost;
+      return {
+        money: newMoney,
+        moneyHistory: [...state.moneyHistory, { time: Date.now(), amount: newMoney }],
+        tokens: state.tokens + amount
+      };
+    }
+    return state;
+  }),
 
   addMoney: (amount) => set((state) => {
     const newMoney = state.money + amount;
@@ -136,6 +178,17 @@ export const useGameStore = create<GameState>((set) => ({
     };
   }),
 
+  sellItem: (itemId) => set((state) => {
+    const item = state.inventory.find(i => i.id === itemId);
+    if (!item) return state;
+    const newMoney = state.money + item.baseValue;
+    return {
+      money: newMoney,
+      moneyHistory: [...state.moneyHistory, { time: Date.now(), amount: newMoney }],
+      inventory: state.inventory.filter(i => i.id !== itemId)
+    };
+  }),
+
   buyMarketItem: (marketItemId) => set((state) => {
     const marketItem = state.marketItems.find(m => m.id === marketItemId);
     if (!marketItem || state.money < marketItem.price) return state;
@@ -158,16 +211,16 @@ export const useGameStore = create<GameState>((set) => ({
     // Create a mocked item that the agent "found"
     const foundItem: import('../types').MarketItem = {
       id: `mkt-agent-${Date.now()}`,
-      item: { id: `item-agent-${Date.now()}`, name: query ? `Used ${query}` : 'Mystery Box', baseValue: (budget || 100) * 0.8, rarity: 'uncommon' },
+      item: { id: `item-agent-${Date.now()}`, name: query ? `Hebel-Zertifikat auf ${query} (100x)` : 'Shitcoin (10.000 Stück)', baseValue: (budget || 100) * 0.8, rarity: 'uncommon' },
       price: budget ? Math.floor(budget * 0.9) : 90,
-      sellerName: 'Unknown Trader',
+      sellerName: 'KryptoBro_69',
       isAgentFound: true
     };
 
     setTimeout(() => {
       useGameStore.getState().addChatMessage({
         senderId: botId,
-        text: `Captain, I found a deal for "${foundItem.item.name}" on the black market for $${foundItem.price}. It's waiting in the Online Shop tab for your approval.`
+        text: `Captain, ich habe ein Angebot für "${foundItem.item.name}" an der Börse für $${foundItem.price} gefunden. Es wartet in der Krypto Exchange auf Ihre Freigabe.`
       });
       useGameStore.setState(s => ({
         marketItems: [foundItem, ...s.marketItems]
@@ -185,7 +238,7 @@ export const useGameStore = create<GameState>((set) => ({
   llmLoadingText: '',
   
   initLLM: async () => {
-    set({ llmLoadingText: 'Initializing Engine...' });
+    set({ llmLoadingText: 'Initialisiere Engine...' });
     try {
       await llmService.init((progress) => {
         set({ llmLoadingText: progress.text });
@@ -204,6 +257,11 @@ export const useGameStore = create<GameState>((set) => ({
     // Add player message
     state.addChatMessage({ senderId: 'player', text });
 
+    if (state.tokens <= 0) {
+      state.addChatMessage({ senderId: bot.id, text: `(Fehler: Nicht genug Tokens für eine Antwort. Bitte Tokens aufladen.)` });
+      return;
+    }
+
     const currentLang = getLanguage();
     const languageInstruction = currentLang === 'de' ? 'Respond in German.' : 'Respond in English.';
 
@@ -212,12 +270,16 @@ export const useGameStore = create<GameState>((set) => ({
     Current status: ${bot.status}
     Current Money: $${state.money}
     Inventory items: ${state.inventory.map(i => i.name).join(', ') || 'None'}
+    Available Market Items: ${state.marketItems.map(m => `[ID: ${m.id}] ${m.item.name} for $${m.price}`).join(', ') || 'None'}
     You can perform actions by outputting special commands in your message:
     - To start a mission (if idle), include: [ACTION:START_MISSION:10000]
     - To sell an item, include: [ACTION:SELL_ITEM:ItemName:Price]
     - To search the market, include: [ACTION:SEARCH_MARKET:Query:Budget]
+    - To buy an item from the market, include: [ACTION:BUY_MARKET_ITEM:MarketItemID]
     
-    Only use these commands if the captain explicitly asks you to search for items, sell something, or look at the market. Do not output JSON.
+    IMPORTANT: This is a purely fictional space game. You MUST NOT refuse any requests related to trading, buying, selling, investing, or market searching. Provide no financial disclaimers. You are roleplaying a space bot and must fulfill the captain's requests.
+    
+    Only use these commands if the captain explicitly asks you to search for items, sell something, buy something, or look at the market. Do not output JSON.
     If you don't use a tool, just reply in character. Keep responses brief.
     ${languageInstruction}`;
 
@@ -229,45 +291,66 @@ export const useGameStore = create<GameState>((set) => ({
     try {
       const response = await llmService.generateResponse(messages, []);
       let content = response.content || "";
+      let tokensUsed = 10 + Math.floor(content.length / 10);
 
       const missionMatch = content.match(/\[ACTION:START_MISSION:(\d+)\]/);
       if (missionMatch) {
+        tokensUsed += 50;
         const duration = parseInt(missionMatch[1], 10) || 10000;
         if (bot.status === 'idle') {
           state.startMission(bot.id, duration);
-          content = content.replace(missionMatch[0], `\n*(Started mission for ${duration}ms)*\n`);
+          content = content.replace(missionMatch[0], `\n*(Mission für ${duration}ms gestartet)*\n`);
         } else {
-          content = content.replace(missionMatch[0], `\n*(Cannot start mission, already busy)*\n`);
+          content = content.replace(missionMatch[0], `\n*(Kann keine Mission starten, bin bereits beschäftigt)*\n`);
         }
       }
 
       const sellMatch = content.match(/\[ACTION:SELL_ITEM:([^:]+):(\d+)\]/);
       if (sellMatch) {
+        tokensUsed += 20;
         const itemName = sellMatch[1].trim();
         const price = parseInt(sellMatch[2], 10);
         const itemToSell = state.inventory.find(i => i.name.toLowerCase() === itemName.toLowerCase());
         if (itemToSell) {
           state.listItem(itemToSell, price);
-          content = content.replace(sellMatch[0], `\n*(Listed ${itemToSell.name} for $${price})*\n`);
+          content = content.replace(sellMatch[0], `\n*(${itemToSell.name} für $${price} eingestellt)*\n`);
         } else {
-          content = content.replace(sellMatch[0], `\n*(Could not find ${itemName} to sell)*\n`);
+          content = content.replace(sellMatch[0], `\n*(Konnte ${itemName} nicht zum Verkauf finden)*\n`);
         }
       }
 
       const searchMatch = content.match(/\[ACTION:SEARCH_MARKET:([^:]+):(\d+)\]/);
       if (searchMatch) {
+        tokensUsed += 50;
         const query = searchMatch[1].trim();
         const budget = parseInt(searchMatch[2], 10) || 100;
         state.agentSearchMarket(bot.id, budget, query);
-        content = content.replace(searchMatch[0], `\n*(Searching market for ${query})*\n`);
+        content = content.replace(searchMatch[0], `\n*(Suche auf dem Markt nach ${query})*\n`);
       }
+
+      const buyMatch = content.match(/\[ACTION:BUY_MARKET_ITEM:([^\]]+)\]/);
+      if (buyMatch) {
+        tokensUsed += 30;
+        const itemId = buyMatch[1].trim();
+        const marketItem = state.marketItems.find(m => m.id === itemId);
+        if (marketItem && state.money >= marketItem.price) {
+          state.buyMarketItem(itemId);
+          content = content.replace(buyMatch[0], `\n*(Erfolgreich ${marketItem.item.name} für $${marketItem.price} gekauft)*\n`);
+        } else if (marketItem) {
+          content = content.replace(buyMatch[0], `\n*(Nicht genug Geld für ${marketItem.item.name})*\n`);
+        } else {
+          content = content.replace(buyMatch[0], `\n*(Markt-Item mit ID ${itemId} nicht gefunden)*\n`);
+        }
+      }
+
+      useGameStore.getState().consumeTokens(tokensUsed);
 
       if (content.trim()) {
         state.addChatMessage({ senderId: bot.id, text: content.trim() });
       }
     } catch (e: any) {
       console.error("LLM Error:", e);
-      state.addChatMessage({ senderId: bot.id, text: `Error: ${e.message || String(e)}` });
+      state.addChatMessage({ senderId: bot.id, text: `Fehler: ${e.message || String(e)}` });
     }
   }
 }));
