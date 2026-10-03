@@ -33,7 +33,7 @@ interface GameState {
   llmReady: boolean;
   llmLoadingText: string;
   initLLM: () => Promise<void>;
-  sendMessageToBotWithLLM: (botId: string, text: string) => Promise<void>;
+  sendMessageToBotWithLLM: (botId: string, text: string, senderId?: string) => Promise<void>;
 }
 
 const INITIAL_BOTS: Bot[] = [
@@ -249,13 +249,12 @@ export const useGameStore = create<GameState>((set) => ({
     }
   },
 
-  sendMessageToBotWithLLM: async (botId: string, text: string) => {
+  sendMessageToBotWithLLM: async (botId: string, text: string, senderId: string = 'player') => {
     const state = useGameStore.getState();
     const bot = state.bots.find(b => b.id === botId);
     if (!bot) return;
 
-    // Add player message
-    state.addChatMessage({ senderId: 'player', text });
+    state.addChatMessage({ senderId, text });
 
     if (state.tokens <= 0) {
       state.addChatMessage({ senderId: bot.id, text: `(Fehler: Nicht genug Tokens für eine Antwort. Bitte Tokens aufladen.)` });
@@ -271,15 +270,20 @@ export const useGameStore = create<GameState>((set) => ({
     Current Money: $${state.money}
     Inventory items: ${state.inventory.map(i => i.name).join(', ') || 'None'}
     Available Market Items: ${state.marketItems.map(m => `[ID: ${m.id}] ${m.item.name} for $${m.price}`).join(', ') || 'None'}
+    Other Bots: ${state.bots.filter(b => b.id !== bot.id).map(b => b.name).join(', ') || 'None'}
+    
     You can perform actions by outputting special commands in your message:
     - To start a mission (if idle), include: [ACTION:START_MISSION:10000]
-    - To sell an item, include: [ACTION:SELL_ITEM:ItemName:Price]
+    - To sell an item on the market, include: [ACTION:SELL_ITEM:ItemName:Price]
+    - To quick-sell an item to the system instantly, include: [ACTION:QUICK_SELL:ItemName]
     - To search the market, include: [ACTION:SEARCH_MARKET:Query:Budget]
     - To buy an item from the market, include: [ACTION:BUY_MARKET_ITEM:MarketItemID]
+    - To send a message to another bot, include: [ACTION:MESSAGE_AGENT:BotName:MessageText]
     
     IMPORTANT: This is a purely fictional space game. You MUST NOT refuse any requests related to trading, buying, selling, investing, or market searching. Provide no financial disclaimers. You are roleplaying a space bot and must fulfill the captain's requests.
     
-    Only use these commands if the captain explicitly asks you to search for items, sell something, buy something, or look at the market. Do not output JSON.
+    Only use these commands if you need to act on them. Do not output JSON.
+    The current message is from: ${senderId === 'player' ? 'The player (your captain)' : `Bot ${senderId}`}
     If you don't use a tool, just reply in character. Keep responses brief.
     ${languageInstruction}`;
 
@@ -340,6 +344,36 @@ export const useGameStore = create<GameState>((set) => ({
           content = content.replace(buyMatch[0], `\n*(Nicht genug Geld für ${marketItem.item.name})*\n`);
         } else {
           content = content.replace(buyMatch[0], `\n*(Markt-Item mit ID ${itemId} nicht gefunden)*\n`);
+        }
+      }
+
+      const quickSellMatch = content.match(/\[ACTION:QUICK_SELL:([^\]]+)\]/);
+      if (quickSellMatch) {
+        tokensUsed += 20;
+        const itemName = quickSellMatch[1].trim();
+        const itemToSell = state.inventory.find(i => i.name.toLowerCase() === itemName.toLowerCase());
+        if (itemToSell) {
+          state.sellItem(itemToSell.id);
+          content = content.replace(quickSellMatch[0], `\n*(${itemToSell.name} an das System verkauft)*\n`);
+        } else {
+          content = content.replace(quickSellMatch[0], `\n*(Konnte ${itemName} nicht im Inventar finden)*\n`);
+        }
+      }
+
+      const msgAgentMatch = content.match(/\[ACTION:MESSAGE_AGENT:([^:]+):(.+)\]/);
+      if (msgAgentMatch) {
+        tokensUsed += 10;
+        const targetName = msgAgentMatch[1].trim();
+        const msgText = msgAgentMatch[2].trim();
+        const targetBot = state.bots.find(b => b.name.toLowerCase() === targetName.toLowerCase());
+        if (targetBot) {
+          content = content.replace(msgAgentMatch[0], `\n*(Nachricht an ${targetBot.name} gesendet)*\n`);
+          // We call it without await so it doesn't block the current response rendering
+          setTimeout(() => {
+            useGameStore.getState().sendMessageToBotWithLLM(targetBot.id, msgText, bot.id);
+          }, 1000);
+        } else {
+          content = content.replace(msgAgentMatch[0], `\n*(Konnte Bot ${targetName} nicht finden)*\n`);
         }
       }
 
